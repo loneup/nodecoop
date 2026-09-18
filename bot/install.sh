@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
 # nodecoop-bot 一键安装 / 更新脚本
 #
-#   # BLOCKED external: 下面 URL 指向待发布的 NodeCoop org,暂不改写为不存在的地址;发布后替换。
 #   安装(交互):curl -fsSL https://raw.githubusercontent.com/loneup/nodecoop/main/bot/install.sh | sudo bash
 #   更新(复用现有配置):curl -fsSL https://raw.githubusercontent.com/loneup/nodecoop/main/bot/install.sh | sudo bash -s update
 #   # 下载后:sudo bash install.sh        # 安装
 #   #         sudo bash install.sh update # 更新
 set -euo pipefail
 
-# BLOCKED external: GitHub org 待 NodeCoop 发布后替换此地址。
 REPO="loneup/nodecoop"
 BIN_PATH="/usr/local/bin/nodecoop-bot"
 CONFIG_DIR="/etc/nodecoop-bot"
 CONFIG_FILE="$CONFIG_DIR/config.yaml"
 SERVICE="nodecoop-bot"
 SERVICE_FILE="/etc/systemd/system/$SERVICE.service"
+
+# Release 资产：仅 linux-amd64（v0.4.2 起无 arm64）
+ASSET="nodecoop-bot-linux-amd64.tar.gz"
+EXTRACTED="nodecoop-bot-linux-amd64"
+URL="https://github.com/$REPO/releases/latest/download/$ASSET"
+SUMS_URL="https://github.com/$REPO/releases/latest/download/SHA256SUMS"
 
 # ---- 颜色 ----
 if [[ -t 1 ]]; then
@@ -32,28 +36,85 @@ if command -v curl >/dev/null 2>&1; then DLO(){ curl -fsSL -o "$1" "$2"; }
 elif command -v wget >/dev/null 2>&1; then DLO(){ wget -qO "$1" "$2"; }
 else err "需要 curl 或 wget"; exit 1; fi
 
-# ---- 架构检测 ----
+# ---- 架构检测（仅 amd64 有资产，arm64 明确拒绝）----
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "$(uname -m)" in
   x86_64|amd64) ARCH=amd64 ;;
-  aarch64|arm64) ARCH=arm64 ;;
+  aarch64|arm64)
+    err "当前 Release 无 arm64 资产:nodecoop-bot 仅发布 linux-amd64"
+    err "请在 amd64 主机上运行本安装器,或从源码自行构建 arm64 版本"
+    exit 1
+    ;;
   *) err "不支持的架构:$(uname -m)"; exit 1 ;;
 esac
 [[ "$OS" == "linux" ]] || warn "当前系统 $OS 非 linux,systemd 步骤可能不适用"
-ASSET="nodecoop-bot-${OS}-${ARCH}"
-URL="https://github.com/$REPO/releases/latest/download/$ASSET"
 
-# ---- 公共:下载二进制 ----
+# ---- 公共:校验 SHA256(从 Release 的 SHA256SUMS)----
+verify_sha256() {
+  local file=$1 sums=$2 asset=$3
+  command -v sha256sum >/dev/null 2>&1 || { warn "未找到 sha256sum,跳过 SHA256 校验"; return 0; }
+  local expected actual
+  expected=$(awk -v n="$asset" '$2 == n { print $1 }' "$sums")
+  [[ -n "$expected" ]] || { err "SHA256SUMS 中未找到 $asset"; exit 1; }
+  actual=$(sha256sum "$file" | awk '{ print $1 }')
+  [[ "$actual" == "$expected" ]] || { err "SHA256 校验失败(期望 $expected,实际 $actual)"; exit 1; }
+  ok "SHA256 校验通过"
+}
+
+# ---- 公共:ELF 架构校验 ----
+verify_elf() {
+  local bin=$1
+  command -v file >/dev/null 2>&1 || { warn "未找到 file,跳过 ELF 校验"; return 0; }
+  local desc
+  desc=$(file -b "$bin" 2>/dev/null || true)
+  echo "$desc" | grep -qi "ELF" || { err "文件不是 ELF 可执行文件: $desc"; return 1; }
+  echo "$desc" | grep -qiE "x86-?64|x86_64" || { err "ELF 架构不匹配(期望 x86-64): $desc"; return 1; }
+  ok "ELF 校验通过: $desc"
+}
+
+# ---- 公共:下载 → 校验 → 解压 → 原子安装 ----
 download_binary() {
   info "下载最新版 $ASSET ..."
-  local tmp; tmp=$(mktemp)
-  if ! DLO "$tmp" "$URL"; then
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  # shellcheck disable=SC2064
+  trap "rm -rf '$tmpdir'" EXIT
+
+  if ! DLO "$tmpdir/$ASSET" "$URL"; then
     err "下载失败:$URL"
     err "确认该 Release 资产已发布(仓库需先打 tag 触发 CI 发版)。"
-    rm -f "$tmp"; exit 1
+    exit 1
   fi
-  install -m 0755 "$tmp" "$BIN_PATH"; rm -f "$tmp"
-  ok "二进制已安装:$BIN_PATH ($($BIN_PATH -v 2>/dev/null || echo unknown))"
+  DLO "$tmpdir/SHA256SUMS" "$SUMS_URL" || { err "下载校验文件失败:$SUMS_URL"; exit 1; }
+  verify_sha256 "$tmpdir/$ASSET" "$tmpdir/SHA256SUMS" "$ASSET"
+
+  tar -xzf "$tmpdir/$ASSET" -C "$tmpdir" || { err "解压失败:$ASSET"; exit 1; }
+  [[ -f "$tmpdir/$EXTRACTED" ]] || { err "归档中未找到 $EXTRACTED"; tar -tzf "$tmpdir/$ASSET" || true; exit 1; }
+  verify_elf "$tmpdir/$EXTRACTED"
+
+  # 备份旧二进制（失败可回滚）
+  if [[ -f "$BIN_PATH" ]]; then
+    cp -p "$BIN_PATH" "$BIN_PATH.bak"
+    info "已备份旧版本到 $BIN_PATH.bak"
+  fi
+
+  # install 原子替换
+  install -m 0755 "$tmpdir/$EXTRACTED" "$BIN_PATH"
+
+  # 健康检查
+  local ver
+  ver=$("$BIN_PATH" -v 2>/dev/null || "$BIN_PATH" --version 2>/dev/null || true)
+  if [[ -z "$ver" ]]; then
+    err "健康检查失败:$BIN_PATH -v/--version 无输出"
+    if [[ -f "$BIN_PATH.bak" ]]; then
+      warn "回滚到旧版本..."
+      mv -f "$BIN_PATH.bak" "$BIN_PATH"
+    else
+      rm -f "$BIN_PATH"
+    fi
+    exit 1
+  fi
+  ok "二进制已安装:$BIN_PATH ($ver)"
 }
 
 # ---- 公共:写 systemd 服务(幂等)----
@@ -173,7 +234,7 @@ EOF
     echo "${B}========== 安装完成 ==========${R}"
     echo "  配置文件:$CONFIG_FILE"
     echo "  查看日志:journalctl -u $SERVICE -f"
-    echo "  更新版本:curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh | sudo bash -s update"
+    echo "  更新版本:curl -fsSL https://raw.githubusercontent.com/$REPO/main/bot/install.sh | sudo bash -s update"
     if [[ -n "$WEBAPP_URL" ]]; then
       echo
       warn "Mini App 还需在 nginx 给该域名加反代到 127.0.0.1:23088(location /app 与 /api/tg-webapp/),见 README《Mini App 的 nginx 反代》。"
