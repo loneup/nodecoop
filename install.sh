@@ -126,18 +126,27 @@ verify_elf() {
 }
 
 # ---------------------------------------------------------------------------
-# 健康检查：新二进制 --version 输出非空
+# 健康检查：新二进制 --version 输出稳定单行版本(不含启动 banner)
 # ---------------------------------------------------------------------------
 health_check_binary() {
     local bin="$1"
     echo_info "健康检查: $bin --version ..."
     local ver
-    ver=$("$bin" --version 2>/dev/null || "$bin" -v 2>/dev/null || true)
-    if [ -z "$ver" ]; then
-        echo_error "健康检查失败：二进制 --version / -v 无输出"
+    ver=$("$bin" --version 2>&1 || "$bin" -v 2>&1 || true)
+
+    # 版本接口输出必须是单行、包含 semver 形如 x.y.z；启动 banner(含"启动"或日志时间戳)不算。
+    if ! echo "$ver" | grep -qE '[0-9]+\.[0-9]+\.[0-9]+'; then
+        echo_error "健康检查失败：二进制 --version / -v 未输出版本号(形如 x.y.z)"
+        echo_error "实际输出: ${ver:-<空>}"
         return 1
     fi
-    echo_info "版本信息: $ver"
+    if echo "$ver" | grep -qE '启动|server starting|logger'; then
+        echo_error "健康检查失败：--version 输出疑似启动 banner，不是稳定版本接口"
+        echo_error "实际输出: $ver"
+        return 1
+    fi
+
+    echo_info "版本信息: $(echo "$ver" | head -1)"
     return 0
 }
 

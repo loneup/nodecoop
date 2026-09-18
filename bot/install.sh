@@ -101,11 +101,11 @@ download_binary() {
   # install 原子替换
   install -m 0755 "$tmpdir/$EXTRACTED" "$BIN_PATH"
 
-  # 健康检查
+  # 健康检查：版本输出必须是稳定单行、含 semver x.y.z,非启动 banner
   local ver
   ver=$("$BIN_PATH" -v 2>&1 || "$BIN_PATH" --version 2>&1 || true)
-  if [[ -z "$ver" ]]; then
-    err "健康检查失败:$BIN_PATH -v/--version 无输出"
+  if ! echo "$ver" | grep -qE '[0-9]+\.[0-9]+\.[0-9]+'; then
+    err "健康检查失败:$BIN_PATH -v/--version 未输出版本号(形如 x.y.z)；实际:${ver:-<空>}"
     if [[ -f "$BIN_PATH.bak" ]]; then
       warn "回滚到旧版本..."
       mv -f "$BIN_PATH.bak" "$BIN_PATH"
