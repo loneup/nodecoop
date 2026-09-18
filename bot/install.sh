@@ -14,7 +14,7 @@ CONFIG_FILE="$CONFIG_DIR/config.yaml"
 SERVICE="nodecoop-bot"
 SERVICE_FILE="/etc/systemd/system/$SERVICE.service"
 
-# Release 资产：仅 linux-amd64（v0.4.2 起无 arm64）
+# Release 资产：仅 linux-amd64（正式支持自 v0.4.4 起）
 ASSET="nodecoop-bot-linux-amd64.tar.gz"
 EXTRACTED="nodecoop-bot-linux-amd64"
 URL="https://github.com/$REPO/releases/latest/download/$ASSET"

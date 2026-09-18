@@ -1,8 +1,10 @@
-# UPGRADE-FROM-0.4.2 — 公开 v0.4.2 手动替换指南
+# UPGRADE-FROM-0.4.2 — v0.4.2 内部测试样本迁移指南（外部审计记录）
 
-**摘要**：公开 GitHub Release v0.4.2 agent 二进制嵌入 **OLD** Ed25519 公钥 `XYJvxWTMCb7MxSegm6ntxqHVXKs8/tumDX1mh8p0KjE=`，但 `.sig` 用 **NEW** 私钥签名（NEW pubkey `iJXuE0DFCGjctXaH0w5s69Bqg9cGDDgHzgcHeINlkr4=`）。因此内置自升级 `__verify-update` 必然失败——必须**一次性手动替换**到 v0.4.3+ 后才能恢复自动升级。
+> **S8.5 处置**：v0.4.2 从未正式发布，没有普通用户或外部部署实例。本文档保留作为**外部审计记录**，说明 v0.4.2 用于验证旧签名失败行为和迁移边界。正式产品支持从 v0.4.4 开始，不提供双密钥兼容或 v0.4.2 长期支持。
 
-**适用对象**：从 GitHub Release v0.4.2 (`loneup/nodecoop`) 安装 nodecoop-agent 的用户。**不影响**生产 URL-fixed v0.4.2（已嵌入 NEW pubkey，可正常自升级）。
+**摘要**：公开 GitHub Release v0.4.2 agent 二进制嵌入 **OLD** Ed25519 公钥 `XYJvxWTMCb7MxSegm6ntxqHVXKs8/tumDX1mh8p0KjE=`，但 `.sig` 用 **NEW** 私钥签名（NEW pubkey `iJXuE0DFCGjctXaH0w5s69Bqg9cGDDgHzgcHeINlkr4=`）。因此内置自升级 `__verify-update` 必然失败——**仅在内部迁移/审计验证时需要**一次性手动替换到 ≥v0.4.4 后才能恢复自动升级。
+
+**适用对象（内部审计）**：从 GitHub Release v0.4.2 (`loneup/nodecoop`) 安装 nodecoop-agent 的**内部测试部署**。**不影响**生产 URL-fixed v0.4.2（已嵌入 NEW pubkey，可正常自升级）。
 
 ---
 
