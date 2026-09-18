@@ -103,7 +103,7 @@ download_binary() {
 
   # 健康检查
   local ver
-  ver=$("$BIN_PATH" -v 2>/dev/null || "$BIN_PATH" --version 2>/dev/null || true)
+  ver=$("$BIN_PATH" -v 2>&1 || "$BIN_PATH" --version 2>&1 || true)
   if [[ -z "$ver" ]]; then
     err "健康检查失败:$BIN_PATH -v/--version 无输出"
     if [[ -f "$BIN_PATH.bak" ]]; then
@@ -142,7 +142,7 @@ restart_and_check() {
   systemctl restart "$SERVICE"
   sleep 2
   if systemctl is-active --quiet "$SERVICE"; then
-    ok "$SERVICE 运行中($($BIN_PATH -v 2>/dev/null || echo ''))"
+    ok "$SERVICE 运行中($($BIN_PATH -v 2>&1 || echo ''))"
   else
     err "$SERVICE 启动失败,最近日志:"
     journalctl -u "$SERVICE" --no-pager -n 20 || true
