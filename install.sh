@@ -412,11 +412,11 @@ update_service() {
         exit 1
     fi
 
-    # 显示当前版本
+    # 记录当前版本（.version 内容），用于更新失败时回滚
+    local old_version=""
     if [ -f "$DATA_DIR/.version" ]; then
-        local current_version
-        current_version=$(cat "$DATA_DIR/.version")
-        echo_info "当前版本: $current_version"
+        old_version=$(cat "$DATA_DIR/.version")
+        echo_info "当前版本: $old_version"
     fi
     echo_info "目标版本: $VERSION"
     echo ""
@@ -472,6 +472,12 @@ update_service() {
             mv -f "$INSTALL_DIR/${SERVICE_NAME}.bak" "$INSTALL_DIR/$SERVICE_NAME"
             systemctl start ${SERVICE_NAME}.service || true
             echo_error "已回滚到之前版本"
+            # 同步 .version 到已恢复的旧版本，保持磁盘状态与服务一致
+            if [ -n "$old_version" ]; then
+                echo "$old_version" > "$DATA_DIR/.version"
+            else
+                rm -f "$DATA_DIR/.version"
+            fi
         fi
         echo_error "请查看日志: journalctl -u $SERVICE_NAME -n 50"
         exit 1
@@ -583,6 +589,12 @@ reinstall_service() {
     create_directories
     create_systemd_service
 
+    # 记录当前版本（.version 内容），用于启动失败回滚
+    local old_version=""
+    if [ -f "$DATA_DIR/.version" ]; then
+        old_version=$(cat "$DATA_DIR/.version")
+    fi
+
     # 保存版本信息
     echo "$VERSION" > "$DATA_DIR/.version"
 
@@ -601,6 +613,12 @@ reinstall_service() {
             mv -f "$INSTALL_DIR/${SERVICE_NAME}.bak" "$INSTALL_DIR/$SERVICE_NAME"
             systemctl start ${SERVICE_NAME}.service || true
             echo_error "已回滚到之前版本"
+            # 同步 .version 到已恢复的旧版本，保持磁盘状态与服务一致
+            if [ -n "$old_version" ]; then
+                echo "$old_version" > "$DATA_DIR/.version"
+            else
+                rm -f "$DATA_DIR/.version"
+            fi
         fi
         echo_error "请查看日志: journalctl -u $SERVICE_NAME -n 50"
         exit 1

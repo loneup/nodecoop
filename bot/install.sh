@@ -143,11 +143,11 @@ restart_and_check() {
   sleep 2
   if systemctl is-active --quiet "$SERVICE"; then
     ok "$SERVICE 运行中($($BIN_PATH -v 2>&1 || echo ''))"
-  else
-    err "$SERVICE 启动失败,最近日志:"
-    journalctl -u "$SERVICE" --no-pager -n 20 || true
-    exit 1
+    return 0
   fi
+  err "$SERVICE 启动失败,最近日志:"
+  journalctl -u "$SERVICE" --no-pager -n 20 || true
+  return 1
 }
 
 MODE="${1:-install}"
@@ -160,7 +160,17 @@ case "$MODE" in
     [[ -f "$CONFIG_FILE" ]] || warn "未找到 $CONFIG_FILE(仍会更新二进制,但服务可能起不来)"
     download_binary
     [[ -f "$SERVICE_FILE" ]] || write_service   # 老版手动装的没有 unit 时补上
-    restart_and_check
+    if ! restart_and_check; then
+      err "更新后服务启动失败,正在回滚..."
+      if [[ -f "$BIN_PATH.bak" ]]; then
+        warn "回滚到旧版本..."
+        mv -f "$BIN_PATH.bak" "$BIN_PATH"
+        systemctl start "$SERVICE" || true
+        err "已回滚到之前版本"
+      fi
+      err "请查看日志:journalctl -u $SERVICE -n 50"
+      exit 1
+    fi
     echo
     ok "更新完成!(配置沿用 $CONFIG_FILE)"
     echo "  查看日志:journalctl -u $SERVICE -f"
@@ -228,7 +238,7 @@ EOF
     fi
 
     write_service
-    restart_and_check
+    restart_and_check || exit 1
 
     echo
     echo "${B}========== 安装完成 ==========${R}"
