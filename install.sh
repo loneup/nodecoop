@@ -6,8 +6,8 @@
 set -e
 
 # 配置
-# 公开安装源：loneup/installer（极简仓库，仅 install.sh + Release 二进制）
-GITHUB_REPO="loneup/installer"  # loneup/installer 公开仓库
+# 公开安装源：loneup/nodecoop（公开分发仓）
+GITHUB_REPO="loneup/nodecoop"  # loneup/nodecoop 公开分发仓
 VERSION=""  # 将自动获取最新版本
 BINARY_NAME=""  # 将根据架构自动设置
 INSTALL_DIR="/usr/local/bin"

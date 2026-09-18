@@ -3,7 +3,7 @@
 # Usage: curl -fsSL <url>/install.sh | bash -s -- -master https://your-master-url -token <token>
 set -e
 
-REPO="loneup/speedtester"
+REPO="loneup/nodecoop"
 BINARY_NAME="nodecoop-speedtester"
 INSTALL_DIR="."
 

@@ -2,14 +2,14 @@
 # nodecoop-bot 一键安装 / 更新脚本
 #
 #   # BLOCKED external: 下面 URL 指向待发布的 NodeCoop org,暂不改写为不存在的地址;发布后替换。
-#   安装(交互):curl -fsSL https://raw.githubusercontent.com/loneup/bot-installer/main/install.sh | sudo bash
-#   更新(复用现有配置):curl -fsSL https://raw.githubusercontent.com/loneup/bot-installer/main/install.sh | sudo bash -s update
+#   安装(交互):curl -fsSL https://raw.githubusercontent.com/loneup/nodecoop/main/bot/install.sh | sudo bash
+#   更新(复用现有配置):curl -fsSL https://raw.githubusercontent.com/loneup/nodecoop/main/bot/install.sh | sudo bash -s update
 #   # 下载后:sudo bash install.sh        # 安装
 #   #         sudo bash install.sh update # 更新
 set -euo pipefail
 
 # BLOCKED external: GitHub org 待 NodeCoop 发布后替换此地址。
-REPO="loneup/bot-installer"
+REPO="loneup/nodecoop"
 BIN_PATH="/usr/local/bin/nodecoop-bot"
 CONFIG_DIR="/etc/nodecoop-bot"
 CONFIG_FILE="$CONFIG_DIR/config.yaml"
